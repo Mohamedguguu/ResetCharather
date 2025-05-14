@@ -3,78 +3,194 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Reset Character - Click for Points</title>
+  <title>Secure Click Game</title>
+  <!-- Firebase Core -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <!-- FirebaseUI for Auth -->
+  <link type="text/css" rel="stylesheet" href="https://cdn.firebase.com/libs/firebaseui/6.0.1/firebaseui.css" />
+  <script src="https://cdn.firebase.com/libs/firebaseui/6.0.1/firebaseui.js"></script>
   <style>
+    :root {
+      --bg-light: #f0f0f0;
+      --bg-dark: #1e1e1e;
+      --text-light: #333;
+      --text-dark: #eee;
+      --btn-bg-light: linear-gradient(145deg, #e0e0e0, #ffffff);
+      --btn-bg-dark: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+      --btn-shadow-light: rgba(0,0,0,0.2);
+      --btn-shadow-dark: rgba(0,0,0,0.5);
+    }
     body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+      --bg: var(--bg-light);
+      --text: var(--text-light);
+      --btn-bg: var(--btn-bg-light);
+      --btn-shadow: var(--btn-shadow-light);
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', sans-serif;
       margin: 0;
-      background: #f0f0f0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background 0.3s, color 0.3s;
     }
-    #points {
-      font-size: 2rem;
-      margin-bottom: 1.5rem;
-      color: #333;
+    #container { position: relative; width: 100%; height: 100%; }
+    #bg-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+    .btn { margin: 0.5rem; padding: 1rem 2rem; border: none; border-radius: 12px;
+      background: var(--btn-bg); color: var(--text); cursor: pointer;
+      box-shadow: 8px 8px 15px var(--btn-shadow), -8px -8px 15px rgba(255,255,255,0.7);
+      transition: transform .1s, box-shadow .2s;
     }
-    #reset-btn {
-      position: relative;
-      padding: 1rem 2rem;
-      font-size: 1.2rem;
-      color: #fff;
-      background: #0078d7;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      outline: none;
-      transition: transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
-      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    .btn:hover { transform: translateY(-2px);
+      box-shadow: 12px 12px 20px var(--btn-shadow), -12px -12px 20px rgba(255,255,255,0.7);
     }
-    #reset-btn:hover {
-      box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
-      transform: translateY(-2px);
+    .btn:active { transform: scale(.95);
+      box-shadow: 4px 4px 8px var(--btn-shadow), -4px -4px 8px rgba(255,255,255,0.7);
     }
-    #reset-btn:active {
-      transform: scale(0.95);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    #game { display: none; flex-direction: column; align-items: center; }
+    #points { font-size: 2.5rem; margin-bottom: 1rem; }
+    .shop { position: fixed; right: 20px; bottom: 20px;
+      display: none; flex-direction: column; padding: 1rem; gap: .5rem;
+      background: var(--btn-bg); border-radius: 12px;
+      box-shadow: 8px 8px 15px var(--btn-shadow), -8px -8px 15px rgba(255,255,255,0.7);
     }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(0,120,215, 0.7); }
-      70% { box-shadow: 0 0 0 20px rgba(0,120,215, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(0,120,215, 0); }
+    #leaderboard { position: fixed; top: 20px; right: 20px;
+      padding: 1rem; max-height: 60vh; overflow-y: auto;
+      background: var(--btn-bg); border-radius: 12px;
+      box-shadow: 8px 8px 15px var(--btn-shadow), -8px -8px 15px rgba(255,255,255,0.7);
     }
-    .pulse {
-      animation: pulse 0.6s ease-out;
-    }
+    #leaderboard h3 { margin-top: 0; }
+    #theme-toggle { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); }
   </style>
 </head>
 <body>
-  <div id="points">Points: 0</div>
-  <button id="reset-btn">Reset Character</button>
+  <canvas id="bg-canvas"></canvas>
+  <div id="container">
+    <!-- FirebaseUI Auth Container -->
+    <div id="firebaseui-auth-container"></div>
+    <!-- Game UI -->
+    <div id="game">
+      <div id="points">Points: 0</div>
+      <button class="btn" id="click-btn">Click Me!</button>
+      <button class="btn" id="shop-btn">Shop</button>
+    </div>
+    <div class="shop" id="shop-panel">
+      <div class="shop-item"><span>Item A</span><button class="btn buy" data-cost="5">Buy (5)</button></div>
+      <div class="shop-item"><span>Item B</span><button class="btn buy" data-cost="10">Buy (10)</button></div>
+      <div class="shop-item"><span>Item C</span><button class="btn buy" data-cost="20">Buy (20)</button></div>
+    </div>
+    <div id="leaderboard">
+      <h3>Leaderboard</h3>
+      <ol id="board-list"></ol>
+    </div>
+    <button class="btn" id="theme-toggle">Dark Mode</button>
+  </div>
 
   <script>
-    const btn = document.getElementById('reset-btn');
-    const ptsDisplay = document.getElementById('points');
+    // 1) Fill in your Firebase project’s credentials below
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "resetcharatherdata.firebaseapp.com",
+      databaseURL: "https://resetcharatherdata-default-rtdb.firebaseio.com",
+      projectId: "resetcharatherdata",
+      storageBucket: "resetcharatherdata.appspot.com",
+      messagingSenderId: "159729307751",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
 
-    // Load saved points from localStorage
-    let points = parseInt(localStorage.getItem('points'), 10) || 0;
-    ptsDisplay.textContent = `Points: ${points}`;
-
-    btn.addEventListener('click', () => {
-      // Increment and display points
-      points++;
-      ptsDisplay.textContent = `Points: ${points}`;
-
-      // Save updated points to localStorage
-      localStorage.setItem('points', points);
-
-      // Trigger pulse animation for button
-      btn.classList.add('pulse');
-      setTimeout(() => btn.classList.remove('pulse'), 600);
+    // FirebaseUI setup
+    const ui = new firebaseui.auth.AuthUI(auth);
+    ui.start('#firebaseui-auth-container', {
+      signInFlow: 'popup',
+      signInOptions: [
+        firebase.auth.EmailAuthProvider.PROVIDER_ID,
+        firebase.auth.GoogleAuthProvider.PROVIDER_ID
+      ],
+      callbacks: { signInSuccessWithAuthResult: () => false }
     });
+
+    // DOM refs
+    const gameDiv = document.getElementById('game'),
+          ptsDisplay = document.getElementById('points'),
+          clickBtn = document.getElementById('click-btn'),
+          shopBtn = document.getElementById('shop-btn'),
+          shopPanel = document.getElementById('shop-panel'),
+          boardList    = document.getElementById('board-list'),
+          themeBtn     = document.getElementById('theme-toggle');
+    let userId, points = 0;
+
+    // Auth state
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        userId = user.uid;
+        document.getElementById('firebaseui-auth-container').style.display = 'none';
+        gameDiv.style.display = 'flex';
+        loadData(); listenLeaderboard();
+      } else {
+        ui.reset();
+        document.getElementById('firebaseui-auth-container').style.display = 'block';
+        gameDiv.style.display = 'none';
+      }
+    });
+
+    function loadData() {
+      db.ref(`users/${userId}/points`).once('value').then(snap => {
+        points = snap.val() || 0;
+        ptsDisplay.textContent = `Points: ${points}`;
+      });
+    }
+    clickBtn.addEventListener('click', () => {
+      points++; ptsDisplay.textContent = `Points: ${points}`;
+      db.ref(`users/${userId}`).update({ points });
+    });
+
+    shopBtn.addEventListener('click', () => {
+      shopPanel.style.display = shopPanel.style.display === 'flex' ? 'none' : 'flex';
+    });
+    document.querySelectorAll('.buy').forEach(btn => btn.addEventListener('click', () => {
+      const cost = +btn.dataset.cost;
+      if (points >= cost) {
+        points -= cost;
+        ptsDisplay.textContent = `Points: ${points}`;
+        db.ref(`users/${userId}`).update({ points });
+        btn.textContent = 'Owned'; btn.disabled = true;
+      } else alert('Not enough points!');
+    }));
+
+    function listenLeaderboard() {
+      db.ref('users').orderByChild('points').limitToLast(10)
+        .on('value', snap => {
+          const arr = [];
+          snap.forEach(c => arr.push({ id: c.key, pts: c.val().points }));
+          arr.sort((a,b) => b.pts - a.pts);
+          boardList.innerHTML = '';
+          arr.forEach(u => {
+            const li = document.createElement('li');
+            li.textContent = `${u.id.substring(0,6)}: ${u.pts}`;
+            boardList.append(li);
+          });
+        });
+    }
+
+    // Theme toggle
+    themeBtn.addEventListener('click', () => {
+      const dark = getComputedStyle(document.body).getPropertyValue('--bg') === 'var(--bg-light)';
+      document.body.style.setProperty('--bg', dark ? 'var(--bg-dark)' : 'var(--bg-light)');
+      document.body.style.setProperty('--text', dark ? 'var(--text-dark)' : 'var(--text-light)');
+      document.body.style.setProperty('--btn-bg', dark ? 'var(--btn-bg-dark)' : 'var(--btn-bg-light)');
+      document.body.style.setProperty('--btn-shadow', dark ? 'var(--btn-shadow-dark)' : 'var(--btn-shadow-light)');
+      themeBtn.textContent = dark ? 'Light Mode' : 'Dark Mode';
+    });
+    if (localStorage.getItem('theme') === 'dark') themeBtn.click();
+
+    // Canvas animation (drifting circles) omitted for brevity
   </script>
 </body>
 </html>
