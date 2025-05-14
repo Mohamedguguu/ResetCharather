@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <!--
-  IMPORTANT SECURITY NOTE:
-  - In client-side Firebase apps, the apiKey and other config values are safe to publish, as they are used to identify your project only.
-  - Your real security comes from your Firebase Realtime Database and Storage Rules. Ensure you have strict rules in place to prevent unauthorized reads/writes.
-  - NEVER store service account credentials or private keys in a public repo. Use GitHub Secrets and server-side code (Cloud Functions, API backend) for any privileged operations.
-  - Example: For GitHub Pages, deploy only this front-end. For any sensitive logic, move it to Firebase Cloud Functions and access via secure endpoints.
+  SECURITY SUMMARY:
+  - Client-side config is public by design. Protect your database with strict Rules.
+  - Never embed service account or admin SDK keys in client.
+  - Use GitHub Secrets / Cloud Functions for privileged operations.
+  - Consider App Check (https://firebase.google.com/docs/app-check) to restrict API access to your domains.
 -->
-<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -20,111 +19,126 @@
   <link rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.css" />
   <script defer src="https://www.gstatic.com/firebasejs/ui/6.0.2/firebase-ui-auth.js"></script>
   <style>
-    * { box-sizing: border-box; }
-    :root { --bg-light: #f0f0f0; --bg-dark: #1e1e1e; --text-light: #333; --text-dark: #eee; }
-    html, body { margin:0; padding:0; width:100%; height:100%; font-family:'Segoe UI',sans-serif; }
-    body.light { background: var(--bg-light); color: var(--text-light); }
-    body.dark  { background: var(--bg-dark);  color: var(--text-dark); }
-    #firebaseui-auth-container { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
-    #game { display:none; text-align:center; padding-top:50px; }
-    .btn { margin:10px; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; transition:transform .1s; }
-    .btn:hover { transform: translateY(-2px); }
-    .btn:active { transform: scale(.95); }
-    #shop-panel, #leaderboard { display:none; margin:20px auto; width:90%; max-width:300px; text-align:left; }
-    #leaderboard ol { padding-left:20px; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:sans-serif;height:100vh;display:flex;justify-content:center;align-items:center;background:#f5f5f5;}
+    .container{position:relative;width:100%;max-width:360px;text-align:center}
+    #firebaseui-auth-container{background:#fff;padding:1rem;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
+    #game{display:none}
+    h1{margin-bottom:1rem}
+    .btn{margin:0.5rem;padding:0.75rem 1.5rem;border:none;border-radius:6px;background:#6200ee;color:#fff;cursor:pointer;transition:background 0.2s}
+    .btn:hover{background:#3700b3}
+    .panel{display:none;text-align:left;margin-top:1rem;padding:1rem;background:#fff;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.1)}
+    .panel h2{margin-bottom:0.5rem;font-size:1.1rem}
   </style>
 </head>
-<body class="light">
-  <div id="firebaseui-auth-container"></div>
-  <div id="game">
-    <h1 id="points">Points: 0</h1>
-    <button class="btn" id="click-btn">Click Me!</button>
-    <button class="btn" id="shop-btn">Toggle Shop</button>
-    <button class="btn" id="leader-btn">Toggle Leaderboard</button>
-    <button class="btn" id="theme-toggle">Dark Mode</button>
-    <div id="shop-panel"><h2>Shop</h2>
-      <div><span>Item A</span><button class="btn buy" data-cost="5">Buy (5)</button></div>
-      <div><span>Item B</span><button class="btn buy" data-cost="10">Buy (10)</button></div>
-      <div><span>Item C</span><button class="btn buy" data-cost="20">Buy (20)</button></div>
+<body>
+  <div class="container">
+    <div id="firebaseui-auth-container"></div>
+    <div id="game">
+      <h1 id="points">Points: 0</h1>
+      <button class="btn" id="click-btn">Click me</button>
+      <button class="btn" id="shop-toggle">Shop</button>
+      <button class="btn" id="leader-toggle">Leaderboard</button>
+      <button class="btn" id="admin-toggle" style="display:none; background:#03dac6; color:#000;">Admin Panel</button>
+      <div id="shop" class="panel">
+        <h2>Shop</h2>
+        <div>Item A <button class="btn buy" data-cost="5">Buy (5)</button></div>
+        <div>Item B <button class="btn buy" data-cost="10">Buy (10)</button></div>
+        <div>Item C <button class="btn buy" data-cost="20">Buy (20)</button></div>
+      </div>
+      <div id="leaderboard" class="panel">
+        <h2>Leaderboard</h2>
+        <ol id="board"></ol>
+      </div>
+      <div id="admin" class="panel">
+        <h2>Admin Panel</h2>
+        <button class="btn" id="reset-all">Reset All Scores</button>
+      </div>
     </div>
-    <div id="leaderboard"><h2>Leaderboard</h2><ol id="board-list"></ol></div>
   </div>
 
   <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "resetcharatherdata.firebaseapp.com",
-        databaseURL: "https://resetcharatherdata-default-rtdb.firebaseio.com",
-        projectId: "resetcharatherdata",
-        storageBucket: "resetcharatherdata.appspot.com",
-        messagingSenderId: "159729307751",
-        appId: "YOUR_APP_ID"
-      };
-      firebase.initializeApp(firebaseConfig);
-      const auth = firebase.auth(), db = firebase.database();
-      const ui = new firebaseui.auth.AuthUI(auth);
-      ui.start('#firebaseui-auth-container', {
-        signInFlow: 'popup',
-        signInOptions: [
-          firebase.auth.EmailAuthProvider.PROVIDER_ID,
-          firebase.auth.GoogleAuthProvider.PROVIDER_ID
-        ],
-        callbacks: { signInSuccessWithAuthResult: () => false }
-      });
+  document.addEventListener('DOMContentLoaded',()=>{
+    // Firebase config (public)
+    const firebaseConfig={
+      apiKey:"AIzaSyA3_ykfaFesRQlaoBcedWMs_6v9Q34jrq0",
+      authDomain:"resetcharatherdata.firebaseapp.com",
+      databaseURL:"https://resetcharatherdata-default-rtdb.firebaseio.com",
+      projectId:"resetcharatherdata",
+      storageBucket:"resetcharatherdata.appspot.com",
+      messagingSenderId:"159729307751",
+      appId:"1:159729307751:web:60cf8ae02712fe718984c2",
+      measurementId:"G-04JQSM3KBF"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth=firebase.auth(),db=firebase.database();
 
-      const authContainer = document.getElementById('firebaseui-auth-container');
-      const game = document.getElementById('game');
-      const pts = document.getElementById('points');
-      const clickBtn = document.getElementById('click-btn');
-      const shopBtn = document.getElementById('shop-btn');
-      const leaderBtn = document.getElementById('leader-btn');
-      const themeBtn = document.getElementById('theme-toggle');
-      const shopPanel = document.getElementById('shop-panel');
-      const leaderboard = document.getElementById('leaderboard');
-      const boardList = document.getElementById('board-list');
-      let userId, points = 0;
+    // Initialize FirebaseUI
+    const ui=new firebaseui.auth.AuthUI(auth);
+    ui.start('#firebaseui-auth-container',{signInFlow:'popup',signInOptions:[
+      firebase.auth.EmailAuthProvider.PROVIDER_ID,
+      firebase.auth.GoogleAuthProvider.PROVIDER_ID
+    ],callbacks:{signInSuccessWithAuthResult:()=>false}});
 
-      auth.onAuthStateChanged(user => {
-        if (user) {
-          userId = user.uid;
-          authContainer.style.display = 'none'; game.style.display = 'block';
-          db.ref(`users/${userId}/points`).once('value').then(snap => {
-            points = snap.val() || 0; pts.textContent = `Points: ${points}`;
-          });
-          db.ref('users').orderByChild('points').limitToLast(10)
-            .on('value', snap => {
-              const arr = [];
-              snap.forEach(c => arr.push({ id: c.key.slice(0,6), pts: c.val().points }));
-              arr.sort((a,b) => b.pts - a.pts);
-              boardList.innerHTML = '';
-              arr.forEach(u => boardList.insertAdjacentHTML('beforeend', `<li>${u.id}: ${u.pts}</li>`));
-            });
-        } else {
-          authContainer.style.display = 'block'; game.style.display = 'none';
-        }
-      });
+    // DOM refs
+    const authDiv=document.getElementById('firebaseui-auth-container'),gameDiv=document.getElementById('game');
+    const ptsEl=document.getElementById('points'),clickBtn=document.getElementById('click-btn');
+    const shopBtn=document.getElementById('shop-toggle'),shopPanel=document.getElementById('shop');
+    const leadBtn=document.getElementById('leader-toggle'),leadPanel=document.getElementById('leaderboard');
+    const boardList=document.getElementById('board'),adminBtn=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin');
+    let uid,points=0;
+    const adminEmails=['admin@example.com']; // replace with real admin emails
 
-      clickBtn.onclick = () => {
-        points++; pts.textContent = `Points: ${points}`;
-        db.ref(`users/${userId}`).update({ points });
-      };
-      shopBtn.onclick = () => shopPanel.style.display = shopPanel.style.display === 'block' ? 'none' : 'block';
-      leaderBtn.onclick = () => leaderboard.style.display = leaderboard.style.display === 'block' ? 'none' : 'block';
-      document.querySelectorAll('.buy').forEach(b => b.onclick = () => {
-        const cost = +b.dataset.cost;
-        if (points >= cost) {
-          points -= cost; pts.textContent = `Points: ${points}`;
-          db.ref(`users/${userId}`).update({ points }); b.textContent='Owned'; b.disabled=true;
-        } else alert('Not enough points!');
-      });
-
-      themeBtn.onclick = () => {
-        document.body.classList.toggle('dark'); document.body.classList.toggle('light');
-        themeBtn.textContent = document.body.classList.contains('dark') ? 'Light Mode' : 'Dark Mode';
-      };
-      if (localStorage.getItem('theme') === 'dark') themeBtn.onclick();
+    // Auth state
+    auth.onAuthStateChanged(user=>{
+      if(user&&user.emailVerified){
+        uid=user.uid;authDiv.style.display='none';gameDiv.style.display='block';
+        // show admin if email in list
+        if(adminEmails.includes(user.email))adminBtn.style.display='inline-block';
+        loadPoints();listenLeaderboard();
+      }else{
+        authDiv.style.display='block';gameDiv.style.display='none';
+        if(user&&!user.emailVerified)user.sendEmailVerification();
+      }
     });
+
+    // Load user points
+    function loadPoints(){
+      db.ref(`users/${uid}/points`).once('value').then(s=>{points=s.val()||0;ptsEl.textContent=`Points: ${points}`;});
+    }
+    // Click to increment
+    clickBtn.onclick=()=>{
+      points++;ptsEl.textContent=`Points: ${points}`;
+      db.ref(`users/${uid}`).update({points});
+    };
+
+    // Shop toggle & buy
+    shopBtn.onclick=()=>shopPanel.style.display=shopPanel.style.display==='block'?'none':'block';
+    document.querySelectorAll('.buy').forEach(b=>b.onclick=()=>{
+      const cost=+b.dataset.cost;
+      if(points>=cost){points-=cost;ptsEl.textContent=`Points: ${points}`;db.ref(`users/${uid}`).update({points});b.textContent='Owned';b.disabled=true;}
+      else alert('Not enough points!');
+    });
+
+    // Leaderboard toggle & listen
+    leadBtn.onclick=()=>leadPanel.style.display=leadPanel.style.display==='block'?'none':'block';
+    function listenLeaderboard(){
+      db.ref('users').orderByChild('points').limitToLast(10).on('value',snap=>{
+        const arr=[];snap.forEach(c=>arr.push({u:c.key,p:c.val().points||0}));arr.sort((a,b)=>b.p-a.p);
+        boardList.innerHTML='';arr.forEach(o=>boardList.innerHTML+=`<li>${o.u.slice(0,6)}: ${o.p}</li>`);
+      });
+    }
+
+    // Admin panel
+    adminBtn.onclick=()=>adminPanel.style.display=adminPanel.style.display==='block'?'none':'block';
+    document.getElementById('reset-all').onclick=()=>{
+      if(confirm('Reset all user scores?')){
+        db.ref('users').once('value').then(s=>{
+          s.forEach(c=>db.ref(`users/${c.key}`).update({points:0}));
+        });
+      }
+    };
+  });
   </script>
 </body>
 </html>
