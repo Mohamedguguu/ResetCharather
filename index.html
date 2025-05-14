@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset Character - Click for Points</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #f0f0f0;
+    }
+    #points {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      color: #333;
+    }
+    #reset-btn {
+      position: relative;
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      color: #fff;
+      background: #0078d7;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+      transition: transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
+      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    }
+    #reset-btn:hover {
+      box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+      transform: translateY(-2px);
+    }
+    #reset-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(0,120,215, 0.7); }
+      70% { box-shadow: 0 0 0 20px rgba(0,120,215, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(0,120,215, 0); }
+    }
+    .pulse {
+      animation: pulse 0.6s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div id="points">Points: 0</div>
+  <button id="reset-btn">Reset Character</button>
+
+  <script>
+    const btn = document.getElementById('reset-btn');
+    const ptsDisplay = document.getElementById('points');
+
+    // Load saved points from localStorage
+    let points = parseInt(localStorage.getItem('points'), 10) || 0;
+    ptsDisplay.textContent = `Points: ${points}`;
+
+    btn.addEventListener('click', () => {
+      // Increment and display points
+      points++;
+      ptsDisplay.textContent = `Points: ${points}`;
+
+      // Save updated points to localStorage
+      localStorage.setItem('points', points);
+
+      // Trigger pulse animation for button
+      btn.classList.add('pulse');
+      setTimeout(() => btn.classList.remove('pulse'), 600);
+    });
+  </script>
+</body>
+</html>
